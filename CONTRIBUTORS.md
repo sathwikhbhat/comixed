@@ -15,3 +15,4 @@ what it is today.
  * Heather Anderson <heath@odysseus.anderson.name>
  * Sathwik Hejamady Bhat <sathwikhbhat@gmail.com>
  * Joran Van Belle <joran.vanbelle@live.be>
+ * Ayush Thakur <ayushwork0@gmail.com>

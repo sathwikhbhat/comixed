@@ -20,11 +20,13 @@ package org.comixedproject.auth;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.function.Function;
+import javax.crypto.SecretKey;
 import lombok.extern.log4j.Log4j2;
 import org.comixedproject.model.user.ComiXedRole;
 import org.comixedproject.model.user.ComiXedUser;
@@ -46,7 +48,7 @@ import org.springframework.stereotype.Component;
 public class JwtTokenUtil {
   private static final String ROLE_PREFIX = "ROLE_";
 
-  @Value("${comixed.auth.jwt-signing-key:comixed-project}")
+  @Value("${comixed.auth.jwt-signing-key:comixed-secured-jwt-signing-key!}")
   String signingKey;
 
   @Autowired private ComiXedUserRepository userRepository;
@@ -65,7 +67,8 @@ public class JwtTokenUtil {
   }
 
   private Claims getAllClaimsFromToken(String token) {
-    return Jwts.parser().setSigningKey(this.signingKey).parseClaimsJws(token).getBody();
+    SecretKey key = Keys.hmacShaKeyFor(this.signingKey.getBytes(StandardCharsets.UTF_8));
+    return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
   }
 
   private Boolean isTokenExpired(String token) {
@@ -78,8 +81,6 @@ public class JwtTokenUtil {
   }
 
   String doGenerateToken(String email) {
-
-    var claims = Jwts.claims().setSubject(email);
     List<GrantedAuthority> authorities = new ArrayList<>();
 
     ComiXedUser user = this.userRepository.findByEmail(email);
@@ -89,14 +90,15 @@ public class JwtTokenUtil {
       }
     }
 
-    claims.put("scopes", authorities);
+    SecretKey key = Keys.hmacShaKeyFor(this.signingKey.getBytes(StandardCharsets.UTF_8));
 
     return Jwts.builder()
-        .setClaims(claims)
-        .setIssuer("http://www.comixedproject.org")
-        .setIssuedAt(new Date(System.currentTimeMillis()))
-        .setExpiration(new Date(System.currentTimeMillis() + (5 * 60 * 60) * 1000))
-        .signWith(SignatureAlgorithm.HS256, this.signingKey)
+        .subject(email)
+        .claim("scopes", authorities)
+        .issuer("http://www.comixedproject.org")
+        .issuedAt(new Date(System.currentTimeMillis()))
+        .expiration(new Date(System.currentTimeMillis() + (5 * 60 * 60) * 1000))
+        .signWith(key) // Alg (HS256) is inferred automatically based on key length!
         .compact();
   }
 
